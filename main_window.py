@@ -41,6 +41,7 @@ class MainWindow(QMainWindow):
 
         # UI
         central = QWidget()
+        central.setObjectName("central")
         self.setCentralWidget(central)
         root = QHBoxLayout(central)
         root.setContentsMargins(6, 6, 6, 6)
@@ -423,12 +424,38 @@ class MainWindow(QMainWindow):
     def _start_session(self, sid: str) -> None:
         out = config.FACES_DIR / sid
         if out.exists():
-            ans = QMessageBox.question(
-                self, "Đã tồn tại",
-                f"{sid} đã có dữ liệu. Xoá dữ liệu cũ và bắt đầu lại?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No)
-            if ans != QMessageBox.StandardButton.Yes:
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Đã tồn tại")
+            msg.setText(f"{sid} đã có dữ liệu. Xoá dữ liệu cũ và bắt đầu lại?")
+            msg.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            msg.setDefaultButton(QMessageBox.StandardButton.No)
+            msg.setStyleSheet("""
+                QMessageBox {
+                    background: #0d0f14;
+                    color: #e8edf5;
+                }
+                QMessageBox QLabel {
+                    color: #e8edf5;
+                    font-size: 13px;
+                }
+                QPushButton {
+                    background: #1a1e2b;
+                    color: #c9d1e0;
+                    border: 1px solid #2a2f42;
+                    border-radius: 5px;
+                    padding: 6px 16px;
+                    font-size: 12px;
+                    min-width: 60px;
+                }
+                QPushButton:hover {
+                    background: #2a2f42;
+                    color: #e8edf5;
+                }
+            """)
+            ans = msg.exec()
+            if ans != QMessageBox.StandardButton.Yes.value:
                 self._update_status("Đổi mã SV hoặc bấm lại.")
                 return
             shutil.rmtree(out, ignore_errors=True)

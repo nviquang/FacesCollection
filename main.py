@@ -30,6 +30,29 @@ def run_app(debug_landmarks: bool) -> int:
     from main_window import MainWindow
 
     app = QApplication(sys.argv)
+    app.setStyleSheet("""
+        QMainWindow, QWidget#central {
+            background: #080a0f;
+        }
+        QToolTip {
+            background: #0d0f14;
+            color: #c9d1e0;
+            border: 1px solid #2a2f42;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        QScrollBar:vertical {
+            background: #0a0c11;
+            width: 6px;
+            border-radius: 3px;
+        }
+        QScrollBar::handle:vertical {
+            background: #2a2f42;
+            border-radius: 3px;
+            min-height: 20px;
+        }
+    """)
     win = MainWindow()
     if debug_landmarks:
         win.video.set_debug_landmarks(True)
