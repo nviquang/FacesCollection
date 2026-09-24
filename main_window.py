@@ -69,7 +69,7 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size:18px; font-weight:700; color:#fff;")
         lay.addWidget(title)
 
-        info = QLabel("Thu 5 góc mặt: mũi, cằm, trán, gò má trái/phải.")
+        info = QLabel("Thu 5 hướng mặt: chính diện, ngước lên, cúi xuống, gò má trái/phải.")
         info.setWordWrap(True)
         info.setStyleSheet("color:#cfd3dc; font-size:12px;")
         lay.addWidget(info)
@@ -204,8 +204,8 @@ class MainWindow(QMainWindow):
         self._update_status("Đã lưu 5 góc. Nhập SV kế tiếp để chơi tiếp.")
         # Pháo hoa tại điểm mũi (frame coords).
         origin = (0.0, 0.0)
-        if self.video._packet is not None and "nose" in self.video._packet.points:
-            origin = self.video._packet.points["nose"]
+        if self.video._packet is not None and "center" in self.video._packet.points:
+            origin = self.video._packet.points["center"]
         self.video.trigger_celebration(origin)
         self._save_meta()
         # Session không có clip (start_clip chưa tạo được writer) → xoá cả folder

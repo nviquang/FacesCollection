@@ -1,20 +1,20 @@
-"""Bảng anchor landmark dùng cho game FaceRPG.
+"""Bang anchor landmark dung cho game FaceRPG.
 
-Mục tiêu: trả về toạ độ (x, y) trên khung hình webcam cho 5 mốc trên mặt
-ta muốn lái vào tâm màn hình: nasion (giữa 2 lông mày), mũi, cằm, trán,
-gò má trái, gò má phải.
+Muc tieu: tra ve toa do (x, y) tren khung hinh webcam cho 5 moc tren mat
+ta muon lai vao tam man hinh: nasion (giua 2 long may — diem bat dau),
+va 5 huong xoay dau: center, up, down, left, right.
 
-Nguồn landmark:
-  - face.landmark_2d_106 (106 điểm, model 2d106det) — chính, đọc index từ bảng.
-  - face.landmark_3d_68  (68 điểm, model 1k3d68) — fallback; index 68 chuẩn.
-  - Trán khi fallback 68: tổng hợp từ bbox mặt (68 điểm KHÔNG có index trán dùng
-    được — index hay dùng 27 là glabella, trùng nasion → xem _forehead_68_from_bbox).
+Nguon landmark:
+  - face.landmark_2d_106 (106 diem, model 2d106det) -- chinh, doc index tu bang.
+  - face.landmark_3d_68  (68 diem, model 1k3d68) -- fallback; index 68 chuan.
 
-Lưu ý: insightface 0.7.3 KHÔNG có tài liệu chính thức chỉ mục 106 điểm → index
-trong bảng ANCHORS_2D_106 là index MẶC ĐỊNH (ước từ thứ tự dataset WFLW-106).
-Nếu thực tế điểm sai, calibrate bằng `--debug-landmarks` (in số lên frame) rồi
-chạy `--map <tên> <index>` để ghi đè vào file calib_anchors.json; nếu thiếu
-anchor 2D thì fallback sang 3D-68.
+Index da calibrate thuc te:
+  - nasion (chinh dien / start): 72
+  - center (chinh dien): 72
+  - up (nguoc len): 86
+  - down (cui xuong): composite -- x lay tu 72, y lay tu 105
+  - left (go may trai): 35
+  - right (go may phai): 93
 """
 from typing import Dict, Optional, Tuple
 
@@ -22,65 +22,56 @@ import numpy as np
 
 import config
 
-# --- Tên mốc dùng đồng bộ trong game (key) ---
-NASE = "nasion"      # giữa 2 lông mày (glabella / gốc mũi)
-NOSE = "nose"        # đầu mũi
-CHIN = "chin"        # cằm
-FOREHEAD = "forehead"  # trán (giữa, cao)
-LEFT_CHEEK = "left_cheek"   # gò má trái
-RIGHT_CHEEK = "right_cheek" # gò má phải
+# --- Ten moc dung dong bo trong game (key) ---
+NASE = "nasion"      # giua 2 long may (glabella / goc mui) -- diem bat dau
+CENTER = "center"    # chinh dien (72)
+UP = "up"            # nguoc len (86)
+DOWN = "down"        # cui xuong (composite x<-105, y<-72)
+LEFT = "left"        # go may trai (35)
+RIGHT = "right"      # go may phai (93)
 
-# Index mặc định cho mô hình 2D-106 (ước theo WFLW-106).
-# Calibrate lại bằng --map nếu thấy lệch.
+# Index da calibrate thuc te bang --debug-landmarks.
+# Down la composite: x tu index 105, y tu index 72.
 _DEFAULT_2D_106: Dict[str, int] = {
-    NASE: 35,             # glabella / gốc mũi (giữa 2 mày)
-    NOSE: 51,             # đầu mũi
-    CHIN: 8,              # cằm
-    FOREHEAD: 18,         # trán giữa
-    LEFT_CHEEK: 88,       # gò má trái
-    RIGHT_CHEEK: 96,      # gò má phải
+    NASE: 72,             # chinh dien / start point
+    CENTER: 72,           # chinh dien
+    UP: 86,               # nguoc len
+    DOWN: 72,             # placeholder -- xu ly composite trong point()
+    LEFT: 35,             # go may trai
+    RIGHT: 93,            # go may phai
 }
 
-# Index ISO 68 (chuẩn, gần như mọi bộ 68-point đều dùng):
-#   chin (menton) = 8; nose tip = 30; glabella ~ giữa 2 lông mày = 27;
-#   giữa 2 mày trái-phải = midpoint(21, 22);
-#   gò má 2D — dùng xấp xỉ cạnh: point gần mắt/bờ má.
-# LƯU Ý: KHÔNG có FOREHEAD ở đây — 68 không có index nào an toàn cho trán (27 là
-# glabella, trùng nasion); trán được TỔNG HỢP từ bbox mặt (_forehead_68_from_bbox).
+# Index ISO 68 (chuan, gan nhu moi bo 68-point deu dung):
+#   chin (menton) = 8; nose tip = 30; glabella ~ giua 2 long may = 27;
+#   giua 2 may trai-phai = midpoint(21, 22);
+# LUU Y: KHONG co DOWN o day -- 68 khong co index nao an toan cho tran (27 la
+# glabella, trung nasion); tran duoc TONG HOP tu bbox mat (_forehead_68_from_bbox).
 _68_FALLBACK = {
-    NOSE: 30,
-    CHIN: 8,
-    LEFT_CHEEK: 2,        # bờ xương gò má trái (xấp xỉ)
-    RIGHT_CHEEK: 14,      # bờ xương gò má phải (xấp xỉ)
+    UP: 30,
+    CENTER: 30,
+    LEFT: 2,         # be xuong go may trai (xac xi)
+    RIGHT: 14,       # be xuong go may phai (xac xi)
 }
 
-# Midpoint theo CẶP index (dành cho nasion fallback và các điểm suy từ vai trò
-# đối xứng): (idx_a, idx_b) → trung điểm. Dùng 68 + cặp mắt 68 đã chuẩn.
+# Midpoint theo CAP index (danh cho nasion fallback): (idx_a, idx_b) -> trung diem.
 _MIDPOINTS_68 = {
-    NASE: (21, 22),       # giữa 2 điểm trong lông mày -> giữa 2 mày
+    NASE: (21, 22),       # giua 2 diem trong long may -> giua 2 may
 }
 
-# Tỉ lệ chiều cao bbox để đặt điểm trán tổng hợp (gần đỉnh đầu, trên lông mày).
+# Ti le chieu cao bbox de dat diem tran tong hop (gan dinh dau, tren long may).
 _FOREHEAD_SYNTH_F = 0.08
+
+# --- Composite landmark cho DOWN: lay x tu 72, y tu 105 ---
+_DOWN_X_IDX = 72
+_DOWN_Y_IDX = 105
 
 
 def _forehead_68_from_bbox(face) -> Optional[Tuple[float, float]]:
-    """Tổng hợp điểm trán từ bbox RetinaFace khi fallback 68 (68 KHÔNG có index
-    trán dùng được — index 27 là glabella, trùng nasion).
-
-    RetinaFace bbox chạm đỉnh đầu → đỉnh bbox nằm trên trán. Đặt điểm trán ở
-    x = giữa bbox (trục đối xứng ngang), y = y1 + f*(y2-y1) với f≈0.08 (gần mép
-    trên bbox, phía trên lông mày — nasion nằm GIỮA 2 lông mày nên luôn thấp hơn).
-
-    QUY ƯỚC: nếu bbox thiếu/sai (không phải 4 số, x2<=x1 hoặc y2<=y1) → trả None
-    (không trả nasion!). Cách này giữ gate xoay an toàn: khác biệt trán/nasion bị
-    MẤT thì game bỏ qua target trán thay vì xem nó đã "trúng".
-    """
+    """Tong hop diem tran (DOWN) tu bbox RetinaFace khi fallback 68."""
     bbox = getattr(face, "bbox", None)
     try:
         x1, y1, x2, y2 = (float(v) for v in bbox[:4])
     except (TypeError, ValueError):
-        # bbox thiếu/không phải 4 số — không biết đỉnh đầu ở đâu.
         x1 = y1 = x2 = y2 = float("nan")
     if not (x2 > x1 and y2 > y1):
         return None
@@ -90,38 +81,38 @@ def _forehead_68_from_bbox(face) -> Optional[Tuple[float, float]]:
 
 
 class LandmarkSource:
-    """Bọc việc đọc toạ độ mốc từ Face của insightface, có calibrate + fallback."""
+    """Boc viec doc toa do moc tu Face cua insightface, co calibrate + fallback."""
 
     def __init__(self, calib: Optional[Dict[str, int]] = None) -> None:
-        # calib: dict {tên mốc: index-106} nạp từ file (ưu tiên hơn bảng mặc định).
-        # Nếu không truyền, tự nạp file calib_anchors.json (main.py / MainWindow không truyền).
         if calib is None:
             calib = load_calib()
         self._idx106: Dict[str, int] = dict(_DEFAULT_2D_106)
         if calib:
             for k, v in calib.items():
-                if k in self._idx106 or k in (NOSE, CHIN, FOREHEAD, LEFT_CHEEK, RIGHT_CHEEK):
+                if k in self._idx106 or k in (UP, CENTER, DOWN, LEFT, RIGHT):
                     self._idx106[k] = int(v)
 
-    # --- interface chính ---
+    # --- interface chinh ---
     def point(self, face, name: str) -> Optional[Tuple[float, float]]:
-        """Toạ độ (x, y) của mốc `name` trong khung hình gốc, None nếu thiếu."""
+        """Toa do (x, y) cua moc `name` trong khung hinh goc, None neu thieu."""
         lm106 = np.asarray(getattr(face, "landmark_2d_106", None))
         if lm106 is not None and lm106.ndim == 2 and lm106.shape[0] >= 106:
+            # Down = composite: x tu 72, y tu 105
+            if name == DOWN:
+                if _DOWN_X_IDX < lm106.shape[0] and _DOWN_Y_IDX < lm106.shape[0]:
+                    return float(lm106[_DOWN_X_IDX][0]), float(lm106[_DOWN_Y_IDX][1]-20)
             idx = self._idx106.get(name)
             if idx is not None and 0 <= idx < lm106.shape[0]:
                 return float(lm106[idx][0]), float(lm106[idx][1])
 
-        # Nasion đặc biệt: ưu tiên glabella/index trực tiếp, fallback midpoint mắt.
+        # Nasion dac biet: uu tien glabella/index truc tiep, fallback midpoint mat.
         if name == NASE:
             pt = self._midpoint_68(face, NASE, exact_idx=27)
             if pt is not None:
                 return pt
         lm68 = np.asarray(getattr(face, "landmark_3d_68", None))
         if lm68 is not None and lm68.ndim == 2 and lm68.shape[0] >= 68:
-            # Trán: 68 không có index trán dùng được (27 là glabella = nasion) →
-            # tổng hợp từ bbox mặt (đỉnh bbox nằm trên trán), KHÔNG trả nasion.
-            if name == FOREHEAD:
+            if name == DOWN:
                 return _forehead_68_from_bbox(face)
             idx = _68_FALLBACK.get(name)
             if idx is not None:
@@ -134,7 +125,6 @@ class LandmarkSource:
         lm68 = np.asarray(getattr(face, "landmark_3d_68", None))
         if lm68 is None or lm68.ndim != 2 or lm68.shape[0] < 68:
             return None
-        # Ưu tiên index trực tiếp (exact_idx) cho nasion.
         if exact_idx is not None and exact_idx < lm68.shape[0]:
             return float(lm68[exact_idx][0]), float(lm68[exact_idx][1])
         pair = _MIDPOINTS_68.get(name)
@@ -146,7 +136,7 @@ class LandmarkSource:
         return ((lm68[a][0] + lm68[b][0]) / 2.0, (lm68[a][1] + lm68[b][1]) / 2.0)
 
     def all_points(self, face) -> Optional[np.ndarray]:
-        """106 điểm 2D (raw) để vẽ số khi --debug-landmarks."""
+        """106 diem 2D (raw) de ve so khi --debug-landmarks."""
         lm106 = np.asarray(getattr(face, "landmark_2d_106", None))
         if lm106 is not None and lm106.ndim == 2:
             return lm106
@@ -154,7 +144,7 @@ class LandmarkSource:
 
 
 def load_calib() -> Dict[str, int]:
-    """Nạp calib_anchors.json nếu có."""
+    """Nap calib_anchors.json neu co."""
     try:
         import json
         with open(config.CALIB_FILE, "r", encoding="utf-8") as f:
@@ -165,7 +155,7 @@ def load_calib() -> Dict[str, int]:
 
 
 def save_calib(mapping: Dict[str, int]) -> None:
-    """Ghi calib_anchors.json (idempotent, tạo file nếu chưa có)."""
+    """Ghi calib_anchors.json (idempotent, tao file neu chua co)."""
     import json
     with open(config.CALIB_FILE, "w", encoding="utf-8") as f:
         json.dump(mapping, f, ensure_ascii=False, indent=2)

@@ -143,12 +143,18 @@ class GameSession:
 
         # Cứu hộ: không thỏa được target nào quá lâu (vd điểm mốc index sai trong
         # calibrate) → về ALIGN_NASION để chạy lại, không treo vĩnh viễn.
+        # Chuyển thẳng đến góc CHƯA chụp (không bắt lại từ đầu nếu đã có 1 số góc).
         entered = self._collect_entered_at
         if (entered is not None
                 and self._clock() - entered > self.collect_timeout_secs):
             self._hold_capture = 0
             self._collect_entered_at = None
-            self.target_index = 0
+            # Tìm target đầu tiên chưa chụp
+            captured_keys = set(self.captured)
+            self.target_index = next(
+                (i for i, (k, _, _) in enumerate(self.angles) if k not in captured_keys),
+                len(self.angles)
+            )
             self.state = ALIGN_NASION
             self.on_event(GameEvent("HOLD_FAIL",
                                     "Không đọc được điểm mốc — hãy về vị trí chính diện để bắt đầu lại, hoặc kiểm tra calibrate."))

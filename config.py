@@ -47,7 +47,7 @@ PIPELINE_MODULES = ["detection", "landmark_2d_106", "landmark_3d_68"]
 # --- Game: thu 5 góc mặt (FaceRPG) ---
 # Vị trí 2D-106 của các mốc sẽ được lấy từ landmarks_106.py; các hằng dưới là
 # ngưỡng "đạt chuẩn" để chụp 1 góc.
-R_ALIGN = 34.0              # bán kính (px) để 1 điểm mốc coi là "đúng tâm"
+R_ALIGN = 23.0              # bán kính (px) để 1 điểm mốc coi là "đúng tâm" (2/3 của 34)
 # "Gate xoay": nasion (giữa 2 lông mày) phải nằm trong HÌNH ELIP quanh tâm màn
 # hình trong lúc lái landmark vào tâm. Bán kính đàn hồi theo kích thước bbox mặt
 # (người càng gần camera, mặt càng to, vòng càng rộng):
@@ -63,11 +63,12 @@ R_GATE_SCALE_Y = 0.95       # nhân với chiều cao bbox để lấy vy (cho p
 STABLE_FRAMES_ALIGN = 10    # số frame liên tiếp giữ chuẩn nasion trước khi đếm ngược
 STABLE_FRAMES_CAPTURE = 8   # số frame liên tiếp đúng target+gates trước khi chụp
 COUNTDOWN_SECS = 3          # đếm ngược 3-2-1 trước khi vào chế độ thu
-# Thứ tự 5 góc thu. key = tên file/attr, label tiếng Việt, landmark mục tiêu.
+# Thứ tự 5 góc thu. key = hướng xoay đầu, label tiếng Việt, landmark mục tiêu.
+# Key dùng tên HƯỚNG (center/up/down/left/right) — không dùng tên giải phẫu.
 ANGLES = [
-    ("nose",       "Mũi (mặt chính diện)", "nose"),
-    ("chin",       "Cằm (ngước lên)",      "chin"),
-    ("forehead",   "Trán (cúi xuống)",     "forehead"),
-    ("left_cheek", "Gò má trái",           "left_cheek"),
-    ("right_cheek","Gò má phải",           "right_cheek"),
+    ("center", "Chính diện",   "center"),
+    ("up",     "Ngước lên",    "up"),
+    ("down",   "Cúi xuống",    "down"),
+    ("left",   "Gò má trái",   "left"),
+    ("right",  "Gò má phải",   "right"),
 ]

@@ -35,11 +35,11 @@ def make_packet(frame_w: int = 640, frame_h: int = 480):
     cx, cy = frame_w / 2.0, frame_h / 2.0
     points = {
         "nasion": (cx, cy),
-        "nose": (cx, cy + 10.0),
-        "chin": (cx, cy + 30.0),
-        "forehead": (cx, cy - 30.0),
-        "left_cheek": (cx - 20.0, cy),
-        "right_cheek": (cx + 20.0, cy),
+        "center": (cx, cy + 10.0),
+        "up":     (cx, cy + 30.0),
+        "down":   (cx, cy - 30.0),
+        "left":   (cx - 20.0, cy),
+        "right":  (cx + 20.0, cy),
     }
     face = None
     bbox = (cx - 150.0, cy - 180.0, cx + 150.0, cy + 180.0)  # mặt to → gate rộng

@@ -28,11 +28,10 @@ def make_session(**kw_max):
     return s, evs, clock
 
 
-def pts(nasion=None, nose=None, chin=None, forehead=None, left_cheek=None, right_cheek=None):
+def pts(nasion=None, center=None, up=None, down=None, left=None, right=None):
     d = {}
-    for k, v in [("nasion", nasion), ("nose", nose), ("chin", chin),
-                 ("forehead", forehead), ("left_cheek", left_cheek),
-                 ("right_cheek", right_cheek)]:
+    for k, v in [("nasion", nasion), ("center", center), ("up", up),
+                 ("down", down), ("left", left), ("right", right)]:
         if v is not None:
             d[k] = v
     return d
@@ -115,66 +114,66 @@ class TestCollect(unittest.TestCase):
         s, evs, clock = make_session()
         s.start("A")
         self._to_collect(s, clock)
-        # target 1 = nose: mũi vào tâm, nasion sát tâm.
+        # target 1 = center: chính diện vào tâm, nasion sát tâm.
         for _ in range(3):
             s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0),
-                                                 nose=(320.0, 240.0))))
-        self.assertEqual(s.captured, ["nose"])
+                                                 center=(320.0, 240.0))))
+        self.assertEqual(s.captured, ["center"])
         self.assertEqual(s.target_index, 1)
         self.assertEqual(evs[-2].kind, "CAPTURED")
         self.assertEqual(evs[-1].kind, "NEED_TARGET")  # sang target 2
 
     def test_translation_small_face_rejected(self):
         """Mặt NHỎ (xa camera): gate co về vòng tròn floor → trượt cả mặt để
-        mũi vào tâm (nasion lệch ~50px) bị chặn."""
+        landmark center vào tâm (nasion lệch ~50px) bị chặn."""
         s, evs, clock = make_session()
         s.start("A")
         self._to_collect(s, clock)
         small = (300.0, 220.0, 340.0, 260.0)   # bw=40 → rx=ry=floor 40
         for _ in range(5):
             s.inject_frame(FrameState(points=pts(nasion=(320.0, 190.0),  # dy 50 > 40
-                                                 nose=(320.0, 240.0)),
+                                                 center=(320.0, 240.0)),
                                       bbox=small))
-        self.assertNotIn("nose", s.captured)
+        self.assertNotIn("center", s.captured)
         self.assertEqual(s._hold_capture, 0)
 
     def test_deep_rotation_allowed_big_face(self):
-        """Hồi quy: ngước lên để đưa CẰM vào tâm → nasion lệch trên ~130px.
+        """Hồi quy: ngước lên để đưa UP vào tâm → nasion lệch trên ~130px.
         Với mặt TO gần camera, gate là elip mở rộng theo bbox → CHO PHÉP
-        (trước đây bị vòng tròn tuyệt đối 85px chặn = không chụp được cằm)."""
+        (trước đây bị vòng tròn tuyệt đối 85px chặn = không chụp được)."""
         s, evs, clock = make_session()
         s.start("A")
         self._to_collect(s, clock)
-        self.assertEqual(s.target_index, 0)               # đang thu nose (index 0)
-        # Thu nose trước để sang target chin.
+        self.assertEqual(s.target_index, 0)               # đang thu center (index 0)
+        # Thu center trước để sang target up.
         for _ in range(3):
             s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0),
-                                                 nose=(320.0, 240.0))))
-        self.assertEqual(s.target_index, 1)               # giờ đang cần chin
+                                                 center=(320.0, 240.0))))
+        self.assertEqual(s.target_index, 1)               # giờ đang cần up
         big = BIG_BBOX   # bw=400, bh=350 → ry = max(40, .95*350) ≈ 332
         for _ in range(3):
             s.inject_frame(FrameState(points=pts(nasion=(320.0, 105.0),  # dy 135
-                                                 chin=(320.0, 240.0)),
+                                                 up=(320.0, 240.0)),
                                       bbox=big))
-        self.assertIn("chin", s.captured)
+        self.assertIn("up", s.captured)
 
     def test_face_ok_false_blocks_capture(self):
-        """face_ok=False (mặt nhỏ/quá xa) → KHÔNG chụp dù mũi đúng tâm."""
+        """face_ok=False (mặt nhỏ/quá xa) → KHÔNG chụp dù center đúng tâm."""
         s, evs, clock = make_session()
         s.start("A")
         self._to_collect(s, clock)
         for _ in range(5):
             s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0),
-                                                 nose=(320.0, 240.0)),
+                                                 center=(320.0, 240.0)),
                                       face_ok=False))
-        self.assertNotIn("nose", s.captured)
+        self.assertNotIn("center", s.captured)
         self.assertEqual(s._hold_capture, 0)
         # bật lại face_ok → chụp được ngay.
         for _ in range(3):
             s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0),
-                                                 nose=(320.0, 240.0)),
+                                                 center=(320.0, 240.0)),
                                       face_ok=True))
-        self.assertIn("nose", s.captured)
+        self.assertIn("center", s.captured)
 
     def test_all_five_done(self):
         s, evs, clock = make_session()
@@ -184,11 +183,11 @@ class TestCollect(unittest.TestCase):
         # lệch đúng "pose" cho từng góc (được phép vì gate là elip co theo bbox mặt):
         big = BIG_BBOX  # bw=400 → rx=220, bh=350 → ry=332
         poses = {
-            "nose":        (320.0, 238.0),   # chính diện: nasion sát tâm
-            "chin":        (320.0, 110.0),   # ngước lên: nasion lệch trên sâu
-            "forehead":    (320.0, 370.0),   # cúi xuống: nasion lệch dưới sâu
-            "left_cheek":  (420.0, 240.0),   # xoay yaw trái: nasion lệch ngang
-            "right_cheek": (220.0, 240.0),   # xoay yaw phải: nasion lệch ngang
+            "center": (320.0, 238.0),   # chính diện: nasion sát tâm
+            "up":     (320.0, 110.0),   # ngước lên: nasion lệch trên sâu
+            "down":   (320.0, 370.0),   # cúi xuống: nasion lệch dưới sâu
+            "left":   (420.0, 240.0),   # xoay yaw trái: nasion lệch ngang
+            "right":  (220.0, 240.0),   # xoay yaw phải: nasion lệch ngang
         }
         import config
         for key, _, lm_name in config.ANGLES:
@@ -208,15 +207,15 @@ class TestCollect(unittest.TestCase):
         s, evs, clock = make_session(stable_capture=5)  # đủ cao để 3 frame chưa chụp
         s.start("A")
         self._to_collect(s, clock)
-        self.assertEqual(s.target_index, 0)  # đang cần nose
+        self.assertEqual(s.target_index, 0)  # đang cần center
         frame_ok = FrameState(points=pts(nasion=(320.0, 238.0),
-                                         nose=(320.0, 240.0)))
+                                         center=(320.0, 240.0)))
         for _ in range(3):
             s.inject_frame(frame_ok)
         self.assertEqual(s._hold_capture, 3)
-        self.assertNotIn("nose", s.captured)
+        self.assertNotIn("center", s.captured)
         # Mất target 2 frame → reset hold + HOLD_FAIL đúng 1 lần (chỉ khi đang giữ).
-        missing = FrameState(points=pts(nasion=(320.0, 238.0)))  # bỏ nose
+        missing = FrameState(points=pts(nasion=(320.0, 238.0)))  # bỏ center
         for _ in range(2):
             s.inject_frame(missing)
         self.assertEqual(s._hold_capture, 0)
@@ -226,11 +225,11 @@ class TestCollect(unittest.TestCase):
         for _ in range(3):
             s.inject_frame(frame_ok)
         self.assertEqual(s._hold_capture, 3)
-        self.assertNotIn("nose", s.captured)
+        self.assertNotIn("center", s.captured)
         # Đủ 5 liên tiếp SAU gián đoạn → mới được chụp.
         for _ in range(2):
             s.inject_frame(frame_ok)
-        self.assertEqual(s.captured, ["nose"])
+        self.assertEqual(s.captured, ["center"])
         self.assertEqual(s._hold_capture, 0)
 
     def test_collect_timeout_recovery(self):
@@ -243,13 +242,12 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(s.state, COLLECT)
         # Chưa đủ timeout → vẫn ở COLLECT, chưa reset.
         clock.t += 14.0
-        s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0))))  # mất nose
+        s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0))))  # mất center
         self.assertEqual(s.state, COLLECT)
         # Quá timeout (15s) → về ALIGN_NASION + HOLD_FAIL.
         clock.t += 2.0
         s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0))))
         self.assertEqual(s.state, ALIGN_NASION)
-        self.assertEqual(s.target_index, 0)
         self.assertEqual(s._hold_capture, 0)
         self.assertEqual(s._collect_entered_at, None)
         self.assertEqual(evs[-1].kind, "HOLD_FAIL")
@@ -266,9 +264,31 @@ class TestCollect(unittest.TestCase):
         self._to_collect(s, clock)
         # Chỉ 1 frame target đúng tâm → chụp ngay, hold reset về 0.
         s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0),
-                                             nose=(320.0, 240.0))))
-        self.assertEqual(s.captured, ["nose"])
+                                             center=(320.0, 240.0))))
+        self.assertEqual(s.captured, ["center"])
         self.assertEqual(s._hold_capture, 0)
+
+    def test_timeout_skips_already_captured_angles(self):
+        """Khi timeout reset, target_index phải nhảy đến góc CHƯA chụp,
+        không bắt lại từ đầu những góc đã có."""
+        s, evs, clock = make_session(collect_timeout_secs=5.0)
+        s.start("A")
+        self._to_collect(s, clock)
+        big = BIG_BBOX
+        # Thu góc đầu (center) thành công.
+        for _ in range(3):
+            s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0),
+                                                 center=(320.0, 240.0)),
+                                      bbox=big))
+        self.assertEqual(s.captured, ["center"])
+        self.assertEqual(s.target_index, 1)  # đang cần up
+        # Gây timeout ở góc up.
+        clock.t += 6.0
+        s.inject_frame(FrameState(points=pts(nasion=(320.0, 238.0))))
+        self.assertEqual(s.state, ALIGN_NASION)
+        # target_index phải là 1 (up), KHÔNG phải 0 (center đã chụp rồi).
+        self.assertEqual(s.target_index, 1)
+        self.assertEqual(s.captured, ["center"])  # center vẫn còn trong captured
 
 
 if __name__ == "__main__":

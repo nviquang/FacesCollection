@@ -30,7 +30,8 @@ from landmarks_106 import LandmarkSource
 from video_capture import make_writer, open_webcam
 
 # Các mốc game cần (khớp landmarks_106 + game_logic).
-POINT_NAMES = ("nasion", "nose", "chin", "forehead", "left_cheek", "right_cheek")
+# "nasion" = điểm bắt đầu; các key còn lại là hướng xoay đầu.
+POINT_NAMES = ("nasion", "center", "up", "down", "left", "right")
 
 
 def make_clip_name(ts: Optional[float] = None) -> str:

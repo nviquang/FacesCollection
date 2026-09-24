@@ -44,12 +44,12 @@ def main() -> int:
                         help="Bật overlay đánh số 106 landmark để calibrate.")
     parser.add_argument("--map", nargs=2, metavar=("TÊN", "INDEX"),
                         help="Ghi đè 1 anchor 106 vào calib_anchors.json."
-                             " Tên: nasion|nose|chin|forehead|left_cheek|right_cheek.")
+                             " Tên: nasion|center|up|down|left|right.")
     args = parser.parse_args()
 
     if args.map is not None:
         name, raw = args.map
-        valid = {"nasion", "nose", "chin", "forehead", "left_cheek", "right_cheek"}
+        valid = {"nasion", "center", "up", "down", "left", "right"}
         if name not in valid:
             print(f"TÊN không hợp lệ: {name}. Hợp lệ: {sorted(valid)}")
             return 2

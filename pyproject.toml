@@ -13,6 +13,7 @@ dependencies = [
     "nvidia-cublas-cu12>=12.9.2.10",
     "nvidia-cuda-cupti-cu12>=12.9.79",
     "pyqt6>=6.6",
+    "psutil>=7.2.2",
 ]
 
 [tool.uv]
