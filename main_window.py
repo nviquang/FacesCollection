@@ -10,6 +10,7 @@ import datetime
 import json
 import logging
 import shutil
+from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
@@ -46,10 +47,10 @@ class MainWindow(QMainWindow):
         root.setSpacing(6)
 
         self.video = VideoView()
-        root.addWidget(self.video, stretch=5)   # 5/6
+        root.addWidget(self.video, stretch=4)   # 2/3
 
         panel = self._build_panel()
-        root.addWidget(panel, stretch=1)        # 1/6
+        root.addWidget(panel, stretch=2)        # 1/3
 
         self._start_worker()
         self._update_status(self._session_state_text())
@@ -58,69 +59,218 @@ class MainWindow(QMainWindow):
     def _build_panel(self) -> QWidget:
         panel = QFrame()
         panel.setObjectName("panel")
-        panel.setStyleSheet(
-            "#panel { background:#16181d; border:1px solid #2a2d36; border-radius:8px; }"
-        )
+        panel.setStyleSheet("""
+            #panel {
+                background: #0d0f14;
+                border: 1px solid #1e2130;
+                border-radius: 10px;
+            }
+        """)
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(12, 12, 12, 12)
-        lay.setSpacing(10)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(12)
 
+        # --- Header ---
         title = QLabel("FaceRPG")
-        title.setStyleSheet("font-size:18px; font-weight:700; color:#fff;")
+        title.setStyleSheet(
+            "font-size:16px; font-weight:700; color:#e8edf5; letter-spacing:1px;"
+        )
         lay.addWidget(title)
 
-        info = QLabel("Thu 5 hướng mặt: chính diện, ngước lên, cúi xuống, gò má trái/phải.")
-        info.setWordWrap(True)
-        info.setStyleSheet("color:#cfd3dc; font-size:12px;")
-        lay.addWidget(info)
+        subtitle = QLabel("Thu 5 hướng mặt cho nhận diện sinh viên")
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color:#8b93a3; font-size:11px;")
+        lay.addWidget(subtitle)
 
-        lay.addSpacing(6)
-        sid_lbl = QLabel("Mã sinh viên")
-        sid_lbl.setStyleSheet("color:#cfd3dc; font-size:12px;")
+        # --- Divider ---
+        div = QFrame()
+        div.setFrameShape(QFrame.Shape.HLine)
+        div.setStyleSheet("color: #1e2130;")
+        lay.addWidget(div)
+
+        # --- Student ID input ---
+        sid_lbl = QLabel("MÃ SINH VIÊN")
+        sid_lbl.setStyleSheet(
+            "color:#5b6478; font-size:10px; font-weight:700; letter-spacing:1.5px;"
+        )
         lay.addWidget(sid_lbl)
+
         self.sid_edit = QLineEdit()
         self.sid_edit.setPlaceholderText("VD: 2023123456")
         self.sid_edit.returnPressed.connect(self._toggle_run)
-        self.sid_edit.setStyleSheet("padding:6px; background:#0f1116; color:#fff;"
-                                    "border:1px solid #333; border-radius:5px;")
+        self.sid_edit.setStyleSheet("""
+            QLineEdit {
+                padding: 8px 10px;
+                background: #0a0c11;
+                color: #e8edf5;
+                border: 1px solid #2a2f42;
+                border-radius: 6px;
+                font-size: 13px;
+                selection-background-color: #3b82f6;
+            }
+            QLineEdit:focus {
+                border: 1px solid #3b82f6;
+            }
+            QLineEdit::placeholder {
+                color: #3d4456;
+            }
+        """)
         lay.addWidget(self.sid_edit)
 
+        # --- Start button ---
         self.btn = QPushButton("Bắt đầu thu thập")
         self.btn.clicked.connect(self._toggle_run)
-        self.btn.setStyleSheet(
-            "QPushButton { background:#2d7ff9; color:#fff; padding:10px; border:none;"
-            " border-radius:6px; font-weight:600; }"
-            "QPushButton:hover { background:#3a8aff; }"
-            "QPushButton:disabled { background:#444; }")
+        self.btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3b82f6, stop:1 #2563eb);
+                color: #ffffff;
+                padding: 10px 0;
+                border: none;
+                border-radius: 7px;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #60a5fa, stop:1 #3b82f6);
+            }
+            QPushButton:pressed {
+                background: #1d4ed8;
+            }
+            QPushButton:disabled {
+                background: #1e2130;
+                color: #3d4456;
+            }
+        """)
         lay.addWidget(self.btn)
 
-        self.status = QLabel()
+        # --- Progress: 5 góc ---
+        prog_lbl = QLabel("TIẾN TRÌNH")
+        prog_lbl.setStyleSheet(
+            "color:#5b6478; font-size:10px; font-weight:700; letter-spacing:1.5px;"
+        )
+        lay.addWidget(prog_lbl)
+
+        self._angle_cells: dict = {}
+        prog_row = QHBoxLayout()
+        prog_row.setSpacing(6)
+        for key, label, _ in config.ANGLES:
+            cell = QFrame()
+            cell.setFixedHeight(36)
+            cell.setObjectName(f"angle_{key}")
+            cell.setToolTip(label)
+            cell.setStyleSheet("""
+                QFrame {
+                    background: #1a1e2b;
+                    border: 1px solid #2a2f42;
+                    border-radius: 5px;
+                }
+            """)
+            cell_lay = QVBoxLayout(cell)
+            cell_lay.setContentsMargins(4, 2, 4, 2)
+            lbl = QLabel(label)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet("color:#4a5568; font-size:9px; font-weight:600;")
+            lbl.setObjectName(f"anglelbl_{key}")
+            cell_lay.addWidget(lbl)
+            prog_row.addWidget(cell)
+            self._angle_cells[key] = cell
+        lay.addLayout(prog_row)
+
+        # --- Status area ---
+        self.status = QLabel("Sẵn sàng")
         self.status.setWordWrap(True)
-        self.status.setStyleSheet("color:#ffd24a; font-size:13px;")
+        self.status.setStyleSheet("color:#facc15; font-size:12px;")
         lay.addWidget(self.status)
 
         self.target_label = QLabel()
         self.target_label.setWordWrap(True)
-        self.target_label.setStyleSheet("color:#e8edf5; font-size:13px;")
+        self.target_label.setStyleSheet(
+            "color:#e8edf5; font-size:13px; font-weight:600;"
+        )
         lay.addWidget(self.target_label)
 
         lay.addStretch(1)
 
-        note = QLabel("Hướng dẫn:\n• Đưa giữa 2 lông mày vào tâm màn hình, giữ yên.\n"
-                      "• Quay đầu để mốc được yêu cầu rơi vào tâm.\n"
-                      "• Xoay đầu KHÔNG di chuyển cả mặt.")
+        # --- Hướng dẫn ---
+        note = QLabel(
+            "Hướng dẫn:\n"
+            "1. Đưa giữa 2 lông mày vào tâm, giữ yên.\n"
+            "2. Xoay đầu để mốc yêu cầu vào tâm.\n"
+            "3. Xoay đầu - không dịch cả mặt."
+        )
         note.setWordWrap(True)
-        note.setStyleSheet("color:#8b93a3; font-size:11px;")
+        note.setStyleSheet(
+            "color:#3d4456; font-size:10px; "
+            "background:#0a0c11; border-radius:5px; padding:8px;"
+        )
         lay.addWidget(note)
 
+        # --- Quit button ---
         quit_btn = QPushButton("Thoát")
         quit_btn.clicked.connect(self.close)
-        quit_btn.setStyleSheet(
-            "QPushButton { background:#3a3f4b; color:#fff; padding:8px;"
-            " border:none; border-radius:5px; }"
-            "QPushButton:hover { background:#4a4f5b; }")
+        quit_btn.setStyleSheet("""
+            QPushButton {
+                background: #0f1116;
+                color: #5b6478;
+                padding: 7px;
+                border: 1px solid #1e2130;
+                border-radius: 5px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background: #1a1e2b;
+                color: #8b93a3;
+            }
+        """)
         lay.addWidget(quit_btn)
         return panel
+
+    # ------------------------------------------------------------------ #
+    def _update_angle_cells(self) -> None:
+        """Cập nhật màu 5 ô tiến trình trong panel theo trạng thái session."""
+        if not hasattr(self, "_angle_cells"):
+            return
+        current_target_key = None
+        if self.session.current_target() is not None:
+            current_target_key = self.session.current_target()[0]
+        for key, cell in self._angle_cells.items():
+            lbl = cell.findChild(QLabel, f"anglelbl_{key}")
+            if key in self.session.captured:
+                # Đã chụp - xanh lá
+                cell.setStyleSheet("""
+                    QFrame {
+                        background: #14532d;
+                        border: 1px solid #22c55e;
+                        border-radius: 5px;
+                    }
+                """)
+                if lbl:
+                    lbl.setStyleSheet("color:#86efac; font-size:9px; font-weight:600;")
+            elif key == current_target_key:
+                # Đang cần - xanh dương
+                cell.setStyleSheet("""
+                    QFrame {
+                        background: #1e3a5f;
+                        border: 1px solid #3b82f6;
+                        border-radius: 5px;
+                    }
+                """)
+                if lbl:
+                    lbl.setStyleSheet("color:#93c5fd; font-size:9px; font-weight:600;")
+            else:
+                # Chưa tới - mờ
+                cell.setStyleSheet("""
+                    QFrame {
+                        background: #1a1e2b;
+                        border: 1px solid #2a2f42;
+                        border-radius: 5px;
+                    }
+                """)
+                if lbl:
+                    lbl.setStyleSheet("color:#4a5568; font-size:9px; font-weight:600;")
 
     # ------------------------------------------------------------------ #
     def _start_worker(self) -> None:
@@ -145,6 +295,7 @@ class MainWindow(QMainWindow):
         self.video.current_target = self.session.current_target()
         self.video.captured = list(self.session.captured)
         self.video.update()
+        self._update_angle_cells()
         # Refresh status generic chỉ khi state đổi (tránh đè message cụ thể như "Đã chụp").
         if self.session.state != self._last_status_state:
             self._last_status_state = self.session.state
@@ -163,10 +314,12 @@ class MainWindow(QMainWindow):
             self._save_capture(ev.info)
             self.target_label.setText(f"✅ Đã chụp: {ev.info}")
             self._update_status("Đã lưu 1 góc. Tiếp tục nhé!")
+            self._update_angle_cells()
         elif ev.kind == "HOLD_FAIL":
             self._update_status(ev.info)
         elif ev.kind == "DONE":
             self._finish_session()
+            self._update_angle_cells()
         elif ev.kind == "ALIGNING":
             self.target_label.setText("Điểm giữa 2 lông mày → đưa vào tâm rồi giữ yên.")
             self._update_status("Nhìn chính diện camera, nâng/điều chỉnh để giữa lông mày ở tâm.")
@@ -254,6 +407,7 @@ class MainWindow(QMainWindow):
         self.sid_edit.clear()
         self.sid_edit.setFocus()
         self._update_status("Sẵn sàng. Nhập mã SV mới để bắt đầu.")
+        self._update_angle_cells()
 
     # ------------------------------------------------------------------ #
     def _toggle_run(self) -> None:
