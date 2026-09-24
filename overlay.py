@@ -119,12 +119,25 @@ class VideoView(QWidget):
     # --- reticle --- #
     def _draw_reticle(self, painter: QPainter) -> None:
         cx, cy = self._center
-        # vòng R_ALIGN (phạm vi chụp) — màu xanh khi đúng target, đỏ khi lệch.
         reaching = self._target_reaching()
+        r = config.R_ALIGN * self._scale
+
+        # Outer glow ring khi đang reaching (vẽ trước để bị đè)
+        if reaching:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(0, 255, 120, 40))
+            painter.drawEllipse(QRectF(cx - r * 1.6, cy - r * 1.6,
+                                       r * 3.2, r * 3.2))
+            painter.setBrush(QColor(0, 255, 120, 20))
+            painter.drawEllipse(QRectF(cx - r * 2.2, cy - r * 2.2,
+                                       r * 4.4, r * 4.4))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        # Vòng R_ALIGN chính
         color = QColor(0, 255, 120) if reaching else QColor(240, 70, 70)
         painter.setPen(QPen(color, 2))
-        r = config.R_ALIGN * self._scale
         painter.drawEllipse(QRectF(cx - r, cy - r, 2 * r, 2 * r))
+
         # Elip "gate xoay" (nasion phải ở trong) — co giãn theo bbox mặt như
         # game_logic._gate_rxy: rx theo yaw, ry cho cúi/ngước. Chỉ vào lúc thu.
         if self.state == COLLECT and self._packet is not None and self._packet.bbox is not None:
@@ -132,13 +145,22 @@ class VideoView(QWidget):
             bw, bh = (float(x2) - float(x1)), (float(y2) - float(y1))
             rxg = max(config.R_GATE, config.R_GATE_SCALE_X * bw) * self._scale
             ryg = max(config.R_GATE, config.R_GATE_SCALE_Y * bh) * self._scale
-            painter.setPen(QPen(QColor(255, 255, 255, 70), 1))
+            painter.setPen(QPen(QColor(255, 255, 255, 50), 1))
             painter.drawEllipse(QRectF(cx - rxg, cy - ryg, 2 * rxg, 2 * ryg))
-        # dấu cộng tâm
-        painter.setPen(QPen(QColor(255, 255, 255, 220), 1))
-        a = 9
-        painter.drawLine(QPointF(cx - a, cy), QPointF(cx + a, cy))
-        painter.drawLine(QPointF(cx, cy - a), QPointF(cx, cy + a))
+
+        # Dấu cộng tâm - 4 đoạn ngắn với gap ở giữa
+        painter.setPen(QPen(QColor(255, 255, 255, 200), 1))
+        gap = 5
+        arm = 12
+        painter.drawLine(QPointF(cx - arm - gap, cy), QPointF(cx - gap, cy))
+        painter.drawLine(QPointF(cx + gap, cy), QPointF(cx + arm + gap, cy))
+        painter.drawLine(QPointF(cx, cy - arm - gap), QPointF(cx, cy - gap))
+        painter.drawLine(QPointF(cx, cy + gap), QPointF(cx, cy + arm + gap))
+        # Chấm tâm nhỏ
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(255, 255, 255, 200))
+        painter.drawEllipse(QRectF(cx - 2, cy - 2, 4, 4))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
 
     def _target_reaching(self) -> bool:
         """Đang đúng target trong R_ALIGN (đổi màu reticle)."""
@@ -176,29 +198,90 @@ class VideoView(QWidget):
         if self.state != COUNTDOWN or self.countdown_num <= 0:
             return
         cx, cy = self._center
+        num_str = str(self.countdown_num)
+
+        # Shadow (vẽ trước, lệch xuống phải)
+        f_shadow = QFont(painter.font())
+        f_shadow.setPointSize(72)
+        f_shadow.setBold(True)
+        painter.setFont(f_shadow)
+        painter.setPen(QColor(0, 0, 0, 150))
+        painter.drawText(
+            QRectF(cx - 78, cy - 58, 160, 120),
+            Qt.AlignmentFlag.AlignCenter,
+            num_str,
+        )
+
+        # Text chính - vàng sáng
         f = QFont(painter.font())
         f.setPointSize(72)
         f.setBold(True)
         painter.setFont(f)
-        painter.setPen(QColor(255, 200, 40))
-        cx, cy = self._center
-        painter.drawText(QRectF(cx - 60, cy - 40, 120, 80),
-                         Qt.AlignmentFlag.AlignCenter, str(self.countdown_num))
+        painter.setPen(QColor(250, 204, 21))
+        painter.drawText(
+            QRectF(cx - 80, cy - 60, 160, 120),
+            Qt.AlignmentFlag.AlignCenter,
+            num_str,
+        )
 
-    # --- progress 5 góc (góc trái dưới) --- #
+    # --- progress 5 góc (bottom video, pills căn giữa) --- #
     def _draw_progress(self, painter: QPainter) -> None:
         if not self.angle_defs:
             return
+
+        # Kích thước pill
+        pill_w = 72
+        pill_h = 22
+        pill_r = 11      # border-radius
+        spacing = 8
+        total_w = len(self.angle_defs) * pill_w + (len(self.angle_defs) - 1) * spacing
+        start_x = (self.width() - total_w) / 2
+        y = self.height() - pill_h - 12
+
+        current_key = None
+        if self.current_target is not None:
+            current_key = self.current_target[0]
+
+        painter.setFont(QFont(painter.font().family(), 8))
         fm = painter.fontMetrics()
-        x = 12
-        y = self.height() - 14
-        painter.setFont(QFont(painter.font().family(), 9))
-        for key, label, _ in self.angle_defs:
+
+        for i, (key, label, _) in enumerate(self.angle_defs):
+            x = start_x + i * (pill_w + spacing)
+            rect = QRectF(x, y, pill_w, pill_h)
             done = key in self.captured
-            painter.setPen(QColor(0, 255, 120) if done else QColor(255, 255, 255))
-            text = f"{label} {'✅' if done else '·'}"
-            painter.drawText(x, y, text)
-            x += fm.horizontalAdvance(text) + 16
+            is_current = (key == current_key)
+
+            if done:
+                # Xanh lá
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(20, 83, 45, 200))
+                painter.drawRoundedRect(rect, pill_r, pill_r)
+                painter.setPen(QPen(QColor(34, 197, 94, 180), 1))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRoundedRect(rect, pill_r, pill_r)
+                painter.setPen(QColor(134, 239, 172))
+            elif is_current:
+                # Xanh dương - đang cần
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(30, 58, 95, 220))
+                painter.drawRoundedRect(rect, pill_r, pill_r)
+                painter.setPen(QPen(QColor(59, 130, 246, 200), 1))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRoundedRect(rect, pill_r, pill_r)
+                painter.setPen(QColor(147, 197, 253))
+            else:
+                # Mờ - chưa tới
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(20, 24, 36, 160))
+                painter.drawRoundedRect(rect, pill_r, pill_r)
+                painter.setPen(QPen(QColor(60, 68, 90, 150), 1))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRoundedRect(rect, pill_r, pill_r)
+                painter.setPen(QColor(75, 85, 110))
+
+            # Label text căn giữa pill (truncate nếu dài)
+            display = label if fm.horizontalAdvance(label) < pill_w - 8 else label[:5] + ".."
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, display)
 
     # --- pháo hoa / đốm đỏ --- #
     def trigger_celebration(self, origin_frame: Tuple[float, float]) -> None:
