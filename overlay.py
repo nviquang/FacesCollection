@@ -195,7 +195,7 @@ class VideoView(QWidget):
         painter.setFont(QFont(painter.font().family(), 9))
         for key, label, _ in self.angle_defs:
             done = key in self.captured
-            painter.setPen(QColor(0, 255, 120) if done else QColor(255, 255, 255, 210))
+            painter.setPen(QColor(0, 255, 120) if done else QColor(255, 255, 255))
             text = f"{label} {'✅' if done else '·'}"
             painter.drawText(x, y, text)
             x += fm.horizontalAdvance(text) + 16

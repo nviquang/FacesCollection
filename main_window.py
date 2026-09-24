@@ -75,7 +75,9 @@ class MainWindow(QMainWindow):
         lay.addWidget(info)
 
         lay.addSpacing(6)
-        lay.addWidget(QLabel("Mã sinh viên"))
+        sid_lbl = QLabel("Mã sinh viên")
+        sid_lbl.setStyleSheet("color:#cfd3dc; font-size:12px;")
+        lay.addWidget(sid_lbl)
         self.sid_edit = QLineEdit()
         self.sid_edit.setPlaceholderText("VD: 2023123456")
         self.sid_edit.returnPressed.connect(self._toggle_run)
@@ -249,6 +251,8 @@ class MainWindow(QMainWindow):
         self.video.countdown_num = 0
         self.btn.setText("Bắt đầu thu thập")
         self.btn.setEnabled(True)
+        self.sid_edit.clear()
+        self.sid_edit.setFocus()
         self._update_status("Sẵn sàng. Nhập mã SV mới để bắt đầu.")
 
     # ------------------------------------------------------------------ #
