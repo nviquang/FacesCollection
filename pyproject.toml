@@ -1,0 +1,20 @@
+[project]
+name = "data-collection-for-lms"
+version = "0.2.0"
+description = "FaceRPG — thu thập 5 góc mặt sinh viên (để embedding/recognition sau) bằng game PyQt6."
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "opencv-python>=4.9",
+    "insightface>=0.7.3",
+    "onnxruntime-gpu[cuda,cudnn]>=1.30",
+    "numpy<2",
+    "nvidia-cudnn-cu12>=9.26.0.51",
+    "nvidia-cuda-runtime-cu12>=12.9.79",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "nvidia-cuda-cupti-cu12>=12.9.79",
+    "pyqt6>=6.6",
+]
+
+[tool.uv]
+# Không đóng gói thư viện — chỉ dùng .venv để chạy các script.
+package = false
