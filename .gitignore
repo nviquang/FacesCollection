@@ -19,12 +19,21 @@ venv.bak/
 # ==============================================================================
 # Data collection & biometrics (Dữ liệu khuôn mặt SV, ảnh crop, video clip)
 # ==============================================================================
+# Chỉ giữ placeholder, xóa toàn bộ nội dung thực (ảnh, clip, meta.json)
 data/faces/*
 !data/faces/.gitkeep
 *.mp4
 *.avi
 *.mov
 *.mkv
+*.jpg
+*.jpeg
+*.png
+
+# ==============================================================================
+# Docs nội bộ / kế hoạch AI assistant (không liên quan đến người dùng cuối)
+# ==============================================================================
+docs/
 
 # ==============================================================================
 # Machine Learning models & weights (InsightFace, ONNX, PyTorch)

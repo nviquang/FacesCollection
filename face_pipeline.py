@@ -6,12 +6,39 @@ Vai trò trong game: mỗi frame cung cấp face lớn nhất + độ nét/đạ
 lái landmark vào tâm và chụp crop ảnh. Embedding chưa dùng trong game — bước lưu
 embedding cho recognition sẽ làm sau.
 """
+import os
+import sys
+from pathlib import Path
 from typing import List, Optional
 
 import cv2
 import numpy as np
 
 import config
+
+
+def _setup_nvidia_dlls() -> None:
+    """Nạp DLL của các gói nvidia vào DLL search path (Windows)."""
+    if sys.platform != "win32":
+        return
+    site_packages = Path(sys.prefix) / "Lib" / "site-packages"
+    nvidia_dir = site_packages / "nvidia"
+    if not nvidia_dir.exists():
+        return
+    bin_dirs = []
+    for bin_dir in nvidia_dir.rglob("bin"):
+        if bin_dir.is_dir():
+            s = str(bin_dir)
+            bin_dirs.append(s)
+            try:
+                os.add_dll_directory(s)
+            except (OSError, AttributeError):
+                pass
+    if bin_dirs:
+        os.environ["PATH"] = ";".join(bin_dirs) + ";" + os.environ.get("PATH", "")
+
+
+_setup_nvidia_dlls()
 
 try:
     import insightface
@@ -34,6 +61,7 @@ def _resolve_providers() -> tuple:
 
         available = [p for p in ort.get_available_providers() if "CUDAExecutionProvider" in p]
         if available:
+            print(f"[gpu] Đang dùng GPU: CUDAExecutionProvider (device={config.CUDA_DEVICE_ID}).")
             return ([("CUDAExecutionProvider", {}), "CPUExecutionProvider"], config.CUDA_DEVICE_ID)
         print("[gpu] Không thấy CUDAExecutionProvider trong onnxruntime — fallback CPU.")
     except ImportError:

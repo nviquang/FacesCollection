@@ -1,0 +1,38 @@
+# ==============================================================================
+# requirements.txt — FaceRPG / DataCollectionForLMS
+# Dành cho cài đặt thủ công (không dùng uv). Khuyến khích dùng uv sync.
+#
+# QUAN TRỌNG — ONNX GPU:
+#   Phải cài onnxruntime-gpu, KHÔNG được cài onnxruntime (CPU) song song.
+#   Nếu cài nhầm, insightface sẽ dùng bản CPU thay GPU.
+#   Cài thủ công:
+#       pip uninstall onnxruntime onnxruntime-gpu -y
+#       pip install onnxruntime-gpu==1.30.0
+#
+# Yêu cầu: Python >=3.11,<3.13 | CUDA 12.x | cuDNN 9.x | Windows 10/11 x64
+# ==============================================================================
+
+# --- Core ---
+numpy<2
+
+# --- Computer Vision ---
+opencv-python>=4.9
+
+# --- Face Detection & Landmark (insightface lần đầu tự tải model buffalo_l) ---
+insightface>=0.7.3
+
+# --- ONNX Runtime GPU (thay thế hoàn toàn onnxruntime CPU) ---
+# KHÔNG cài onnxruntime (bản CPU) bên cạnh gói này.
+onnxruntime-gpu>=1.30
+
+# --- NVIDIA CUDA/cuDNN wheels (chỉ cần trên Windows khi không cài CUDA system-wide) ---
+nvidia-cuda-runtime-cu12>=12.9.79
+nvidia-cuda-cupti-cu12>=12.9.79
+nvidia-cublas-cu12>=12.9.2.10
+nvidia-cudnn-cu12>=9.26.0.51
+
+# --- UI ---
+pyqt6>=6.6
+
+# --- System utils ---
+psutil>=7.2.2

@@ -19,3 +19,6 @@ dependencies = [
 [tool.uv]
 # Không đóng gói thư viện — chỉ dùng .venv để chạy các script.
 package = false
+override-dependencies = [
+    "onnxruntime; sys_platform == 'never'",
+]
